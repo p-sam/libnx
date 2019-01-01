@@ -1,3 +1,4 @@
+#include <string.h>
 #include "types.h"
 #include "result.h"
 #include "arm/atomics.h"
@@ -70,4 +71,53 @@ Result lblSwitchBacklightOn(u64 fade_time) {
 
 Result lblSwitchBacklightOff(u64 fade_time) {
     return _lblSwitchBacklight(7, fade_time);
+}
+
+Result lblGetAmbientLightSensorValue(float* out_lux) {
+    IpcCommand c;
+    ipcInitialize(&c);
+
+    struct {
+        u64 magic;
+        u64 cmd_id;
+    } *raw;
+
+    raw = serviceIpcPrepareHeader(&g_lblSrv, &c, sizeof(*raw));
+
+    raw->magic = SFCI_MAGIC;
+    raw->cmd_id = 16;
+
+    Result rc = serviceIpcDispatch(&g_lblSrv);
+
+    if (R_SUCCEEDED(rc)) {
+        IpcParsedCommand r;
+
+        struct {
+            u64 magic;
+            u64 result;
+            union { 
+                u32 bAbove13k;
+                float legacyLux;
+            };
+            float lux;
+        } *resp;
+
+        serviceIpcParse(&g_lblSrv, &r, sizeof(*resp));
+        resp = r.Raw;
+
+        rc = resp->result;
+        if (R_SUCCEEDED(rc)) {
+            if(kernelAbove500()) {
+                if(resp->bAbove13k) {
+                    *out_lux = (13000.0f - resp->lux) + 13000.0f;
+                } else {
+                    *out_lux = resp->lux;
+                }
+            } else {
+                *out_lux = resp->legacyLux;
+            }
+        }
+    }
+
+    return rc;
 }

@@ -12,3 +12,5 @@ void lblExit(void);
 
 Result lblSwitchBacklightOn(u64 fade_time);
 Result lblSwitchBacklightOff(u64 fade_time);
+
+Result lblGetAmbientLightSensorValue(float* out_lux);
